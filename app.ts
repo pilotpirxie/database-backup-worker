@@ -24,6 +24,8 @@ if (
 ) {
   console.error('Missing env properties! Check documentation and try again.');
   process.exit(1);
+} else {
+  console.info(`Starting backup worker. Cron set to "${CRON_PATTERN}" for database: "${DB_NAME}" and S3 bucket: "${S3_BUCKET}"`);
 }
 
 /**

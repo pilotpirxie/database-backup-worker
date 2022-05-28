@@ -1,12 +1,13 @@
 {
   "name": "mysql-backup-worker",
   "version": "1.0.0",
-  "main": "app.ts",
+  "main": "./dist/app.js",
   "repository": "https://github.com/pilotpirxie/mysql-backup-worker.git",
   "author": "pilotpirxie <10637666+pilotpirxie@users.noreply.github.com>",
   "license": "MIT",
   "scripts": {
-    "start": "ts-node app.ts",
+    "start": "node ./dist/app.js",
+    "dev": "ts-node app.ts",
     "eslint": "./node_modules/.bin/eslint .",
     "fix": "./node_modules/.bin/eslint --fix ."
   },
