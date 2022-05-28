@@ -1,6 +1,7 @@
 # mysql-backup-worker
 Backend worker to periodically dump full mysql database and upload to S3
 
+### Setup
 Config in ``.env`` file should looks like following:
 ```shell
 # Database host
@@ -40,5 +41,7 @@ S3_SSL=true
 
 # Use path-style addressing https://s3.amazonaws.com/BUCKET/KEY
 S3_FORCE_PATH_STYLE=true
-
 ```
+
+### License
+```MIT```

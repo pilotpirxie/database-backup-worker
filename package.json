@@ -8,6 +8,7 @@
   "scripts": {
     "start": "node ./dist/app.js",
     "dev": "ts-node app.ts",
+    "build": "tsc --project tsconfig.json",
     "eslint": "./node_modules/.bin/eslint .",
     "fix": "./node_modules/.bin/eslint --fix ."
   },
