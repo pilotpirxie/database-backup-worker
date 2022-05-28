@@ -6,39 +6,25 @@
   "author": "pilotpirxie <10637666+pilotpirxie@users.noreply.github.com>",
   "license": "MIT",
   "scripts": {
-    "prod": "ts-node ./src/app.ts",
-    "dev": "nodemon",
+    "start": "ts-node app.ts",
     "eslint": "./node_modules/.bin/eslint .",
     "fix": "./node_modules/.bin/eslint --fix ."
-  },
-  "nodemonConfig": {
-    "watch": [
-      "src"
-    ],
-    "ext": "ts, html",
-    "ignore": [
-      "src/public"
-    ],
-    "exec": "ts-node ./src/app.ts"
   },
   "dependencies": {
     "aws-sdk": "^2.1145.0",
     "cron": "^2.0.0",
     "dayjs": "^1.11.2",
     "dotenv": "^16.0.1",
-    "mysqldump": "^3.2.0",
-    "uuid": "^8.3.2"
+    "mysqldump": "^3.2.0"
   },
   "devDependencies": {
     "@types/cron": "^2.0.0",
     "@types/node": "^17.0.36",
-    "@types/uuid": "^8.3.4",
     "@typescript-eslint/eslint-plugin": "^5.26.0",
     "@typescript-eslint/parser": "^5.26.0",
     "eslint": "^7.32.0 || ^8.2.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-plugin-import": "^2.25.2",
-    "nodemon": "^2.0.16",
     "ts-node": "^10.8.0",
     "typescript": "^4.7.2"
   }
