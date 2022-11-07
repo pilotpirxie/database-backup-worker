@@ -2,6 +2,13 @@
 # yarn lockfile v1
 
 
+"@clickhouse/client@^0.0.9":
+  version "0.0.9"
+  resolved "https://registry.yarnpkg.com/@clickhouse/client/-/client-0.0.9.tgz#3fe268f16f546e3423c4efb9362582abbee20d66"
+  integrity sha512-d6xhMTlH0yHmQmOqq7iR5p5e9qSBSFmEp2xzX/H5f1INPHM/Dv3gjwB84+a6RuD1EEaZ1vw3WVPNWfG+7ssK5w==
+  dependencies:
+    node-abort-controller "^3.0.1"
+
 "@cspotcode/source-map-support@^0.8.0":
   version "0.8.1"
   resolved "https://registry.yarnpkg.com/@cspotcode/source-map-support/-/source-map-support-0.8.1.tgz#00629c35a688e05a88b1cda684fb9d5e73f000a1"
@@ -1216,6 +1223,11 @@ natural-compare@^1.4.0:
   version "1.4.0"
   resolved "https://registry.yarnpkg.com/natural-compare/-/natural-compare-1.4.0.tgz#4abebfeed7541f2c27acfb29bdbbd15c8d5ba4f7"
   integrity sha1-Sr6/7tdUHywnrPspvbvRXI1bpPc=
+
+node-abort-controller@^3.0.1:
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/node-abort-controller/-/node-abort-controller-3.0.1.tgz#f91fa50b1dee3f909afabb7e261b1e1d6b0cb74e"
+  integrity sha512-/ujIVxthRs+7q6hsdjHMaj8hRG9NuWmwrz+JdRwZ14jdFoKSkm+vDsCbF9PLpnSqjaWQJuTmVtcWHNLr+vrOFw==
 
 object-inspect@^1.12.0, object-inspect@^1.9.0:
   version "1.12.2"

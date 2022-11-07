@@ -16,5 +16,10 @@ module.exports = {
   ],
   rules: {
     'no-console': 'off',
+    'no-plusplus': 'off',
+    'import/extensions': 'off',
+    'import/no-unresolved': 'off',
+    'no-continue': 'off',
+    'class-methods-use-this': 'off',
   },
 };

@@ -1,91 +1,80 @@
 import 'dotenv/config';
 import { CronJob } from 'cron';
-import mysqldump from 'mysqldump';
-import dayjs from 'dayjs';
-import fs from 'fs';
-import AWS from 'aws-sdk';
+import { DatabaseConfiguration, DriverMap, S3Configuration } from './drivers/BackupDriver';
+import MySQLBackupDriver from './drivers/mysql';
+import ClickhouseBackupDriver from './drivers/clickhouse';
+import validate from './utils/validate';
 
 const {
-  DB_HOST, DB_PORT,
-  DB_USER, DB_PASS, DB_NAME,
-  S3_BUCKET, CRON_PATTERN,
+  S3_BUCKET, DB_NUMBER,
   S3_ACCESS_KEY, S3_SECRET_KEY,
   S3_ENDPOINT, S3_SSL,
   S3_FORCE_PATH_STYLE,
 } = process.env;
 
-if (
-  !DB_HOST || !DB_PORT
-  || !DB_USER || !DB_PASS || !DB_NAME
-  || !S3_BUCKET || !CRON_PATTERN
-  || !S3_ACCESS_KEY || !S3_SECRET_KEY
-  || !S3_ENDPOINT || !S3_SSL
-  || !S3_FORCE_PATH_STYLE
-) {
+if (!validate([
+  S3_BUCKET, DB_NUMBER,
+  S3_ACCESS_KEY, S3_SECRET_KEY,
+  S3_ENDPOINT, S3_SSL,
+  S3_FORCE_PATH_STYLE,
+])) {
   console.error('Missing env properties! Check documentation and try again.');
   process.exit(1);
-} else {
-  console.info(`Starting backup worker. Cron set to "${CRON_PATTERN}" for database: "${DB_NAME}" and S3 bucket: "${S3_BUCKET}"`);
 }
 
-/**
- * AWS S3 config
- */
-AWS.config.update({
-  accessKeyId: process.env.S3_ACCESS_KEY,
-  secretAccessKey: process.env.S3_SECRET_KEY,
-  s3: {
-    endpoint: process.env.S3_ENDPOINT,
-    sslEnabled: process.env.S3_SSL === 'true',
-    s3ForcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
-  },
-});
+const s3Config: S3Configuration = {
+  endpoint: S3_ENDPOINT || '',
+  secure: S3_SSL === 'true',
+  secretKey: S3_SECRET_KEY || '',
+  accessKey: S3_ACCESS_KEY || '',
+  bucket: S3_BUCKET || '',
+  forcePathStyle: S3_FORCE_PATH_STYLE === 'true',
+};
 
-const s3 = new AWS.S3({ apiVersion: '2006-03-01' });
+const driverMap: DriverMap = {
+  mysql: new MySQLBackupDriver(s3Config),
+  clickHouse: new ClickhouseBackupDriver(s3Config),
+};
 
-/**
- * Export database backup and safety upload
- *
- * @returns {Promise<void>}
- */
-async function prepareDatabaseBackup() {
-  try {
-    const fileName = `dump_${dayjs().format('DD_MM_YYYY_hh_mm_ss')}.sql`;
-
-    console.info(`Preparing database backup ${fileName}`);
-    await mysqldump({
-      connection: {
-        host: DB_HOST,
-        port: Number(DB_PORT),
-        user: DB_USER || '',
-        password: DB_PASS || '',
-        database: DB_NAME || '',
-      },
-      dumpToFile: fileName,
-    });
-
-    console.info(`Uploading database backup ${fileName}`);
-    s3.upload({
-      Bucket: S3_BUCKET || '',
-      Key: `backup/${DB_NAME}/${fileName}`,
-      Body: fs.readFileSync(fileName),
-      ACL: 'private',
-    }, (err, data) => {
-      if (err) {
-        console.error(err);
-      }
-      console.info(data);
-
-      console.info(`Unlinking database backup ${fileName}`);
-      fs.unlinkSync(fileName);
-
-      console.info(`Backup finished ${fileName}`);
-    });
-  } catch (e) {
-    console.error(e);
+for (let i = 0; i < Number(DB_NUMBER || 1); i++) {
+  if (!validate([
+    process.env[`DB_NAME_${i}`], process.env[`DB_HOST_${i}`],
+    process.env[`DB_PORT_${i}`], process.env[`DB_USER_${i}`],
+    process.env[`DB_PASS_${i}`], process.env[`DB_CRON_PATTERN_${i}`],
+    process.env[`DB_TYPE_${i}`],
+  ])) {
+    console.error(`Missing env properties for database (${i})! Check documentation and try again.`);
+    continue;
   }
-}
 
-new CronJob(CRON_PATTERN, (async () => {
-  await prepareDatabaseBackup();
-})).start();
+  const name = process.env[`DB_NAME_${i}`] || '';
+  const host = process.env[`DB_HOST_${i}`] || '';
+  const port = Number(process.env[`DB_PORT_${i}`]);
+  const user = process.env[`DB_USER_${i}`] || '';
+  const password = process.env[`DB_PASS_${i}`] || '';
+  const cronPattern = process.env[`DB_CRON_PATTERN_${i}`] || '0 */6 * * *';
+  const databaseType = process.env[`DB_TYPE_${i}`] || '';
+
+  const dbConfig: DatabaseConfiguration = {
+    name,
+    password,
+    user,
+    port,
+    host,
+  };
+
+  // eslint-disable-next-line no-prototype-builtins
+  if (!driverMap.hasOwnProperty(databaseType)) {
+    console.error('Invalid database type! Check documentation and try again.');
+    process.exit(1);
+  }
+
+  const cron = new CronJob(cronPattern, () => {
+    driverMap[databaseType].prepareBackup({ database: dbConfig }).catch((err) => {
+      console.error('Error while preparing backup', err);
+    });
+  });
+  cron.start();
+
+  console.info(`Starting backup worker. Cron set to "${cronPattern}" for database: "${name}" and S3 bucket: "${S3_BUCKET}". Next backup at ${cron.nextDate()}`);
+}
