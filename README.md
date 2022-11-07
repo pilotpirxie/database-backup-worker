@@ -1,6 +1,15 @@
 # database-backup-worker
 Backend worker to periodically dump full **MySQL** or **ClickHouse** database and upload to S3. You can setup multiple databases on a single instance.
 
+### Getting started
+```shell
+git clone https://github.com/pilotpirxie/database-backup-worker.git
+cd database-backup-worker
+yarn
+yarn build
+yarn start
+```
+
 ### Setup
 Config in ``.env`` file should look like following:
 ```shell

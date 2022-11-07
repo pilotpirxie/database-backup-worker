@@ -33,7 +33,7 @@ const s3Config: S3Configuration = {
 
 const driverMap: DriverMap = {
   mysql: new MySQLBackupDriver(s3Config),
-  clickHouse: new ClickhouseBackupDriver(s3Config),
+  clickhouse: new ClickhouseBackupDriver(s3Config),
 };
 
 for (let i = 0; i < Number(DB_NUMBER || 1); i++) {
