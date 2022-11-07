@@ -1,11 +1,13 @@
 # database-backup-worker
-Backend worker to periodically dump full mysql or clickhouse database and upload to S3
+Backend worker to periodically dump full **MySQL** or **ClickHouse** database and upload to S3. You can setup multiple databases on a single instance.
 
 ### Setup
 Config in ``.env`` file should look like following:
 ```shell
-# number of db to backup
-DB_NUMBER=0
+# Number of databases to backup
+# For each database setup environment variables prefixed with DB_
+# Index for database config is 0-based
+DB_NUMBER=1
 
 # Cron time pattern, use https://crontab.guru/
 # e.g. "0 */6 * * *" means "At minute 0 past every 6th hour."
@@ -16,9 +18,11 @@ DB_CRON_PATTERN_<INDEX>="0 */6 * * *"
 DB_TYPE_<INDEX>=
 
 # Database host
+# For MySQL use just host
+# For ClickHouse prefix with https:// or http:// protocol
 DB_HOST_<INDEX>=
 
-# Database port, default 3306
+# Database port
 DB_PORT_<INDEX>=
 
 # Database name
