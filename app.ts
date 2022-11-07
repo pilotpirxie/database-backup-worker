@@ -76,5 +76,5 @@ for (let i = 0; i < Number(DB_NUMBER || 1); i++) {
   });
   cron.start();
 
-  console.info(`Starting backup worker. Cron set to "${cronPattern}" for database: "${name}" and S3 bucket: "${S3_BUCKET}". Next backup at ${cron.nextDate()}`);
+  console.info(`Starting backup worker. Cron set to "${cronPattern}" for database ${databaseType}:"${name}" and S3 bucket: "${s3Config.bucket}". Next backup at ${cron.nextDate()}`);
 }
