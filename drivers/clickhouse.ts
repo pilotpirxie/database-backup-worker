@@ -18,7 +18,7 @@ export default class ClickhouseBackupDriver implements BackupDriver {
         database: config.database.name,
       });
 
-      const s3Destination = `${this.s3Data.secure ? 'https://' : 'http://'}${this.s3Data.endpoint}/${this.s3Data.bucket}/${dayjs().format('YYYY_MM_DD_HH_mm_ss')}`;
+      const s3Destination = `${this.s3Data.secure ? 'https://' : 'http://'}${this.s3Data.endpoint}/${this.s3Data.bucket}/backup/clickhouse_${config.database.name}/${dayjs().format('YYYY_MM_DD_HH_mm_ss')}`;
       client.exec({
         query: `BACKUP DATABASE ${config.database.name} TO S3('${s3Destination}', '${this.s3Data.accessKey}', '${this.s3Data.secretKey}');`,
       }).then(() => {

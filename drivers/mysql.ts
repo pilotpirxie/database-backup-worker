@@ -44,7 +44,7 @@ export default class MySQLBackupDriver implements BackupDriver {
       console.info(`Uploading database backup ${fileName}`);
       this.s3.upload({
         Bucket: this.s3Data.bucket,
-        Key: `backup/${config.database.name}/${fileName}`,
+        Key: `backup/mysql_${config.database.name}/${fileName}`,
         Body: fs.readFileSync(fileName),
         ACL: 'private',
       }, (err, data) => {
