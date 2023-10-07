@@ -4,6 +4,7 @@ import { DatabaseConfiguration, DriverMap, S3Configuration } from './drivers/Bac
 import MySQLBackupDriver from './drivers/mysql';
 import ClickhouseBackupDriver from './drivers/clickhouse';
 import validate from './utils/validate';
+import PostgreSQLBackupDriver from './drivers/postgresql';
 
 const {
   S3_BUCKET, DB_NUMBER,
@@ -34,6 +35,7 @@ const s3Config: S3Configuration = {
 const driverMap: DriverMap = {
   mysql: new MySQLBackupDriver(s3Config),
   clickhouse: new ClickhouseBackupDriver(s3Config),
+  postgresql: new PostgreSQLBackupDriver(s3Config),
 };
 
 for (let i = 0; i < Number(DB_NUMBER || 1); i++) {

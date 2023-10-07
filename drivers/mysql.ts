@@ -1,8 +1,9 @@
 import AWS from 'aws-sdk';
 import dayjs from 'dayjs';
 import mysqldump from 'mysqldump';
-import fs from 'fs';
 import { BackupDriver, DatabaseConfiguration, S3Configuration } from './BackupDriver';
+import s3upload from '../utils/s3upload';
+import unlinking from '../utils/unlinking';
 
 export default class MySQLBackupDriver implements BackupDriver {
   private s3: AWS.S3;
@@ -27,7 +28,7 @@ export default class MySQLBackupDriver implements BackupDriver {
 
   async prepareBackup(config: { database: DatabaseConfiguration; }): Promise<void> {
     try {
-      const fileName = `dump_${dayjs().format('DD_MM_YYYY_hh_mm_ss')}.sql`;
+      const fileName = `dump_${dayjs().format('YYYY_MM_DD_hh_mm_ss')}.sql`;
 
       console.info(`Preparing database backup ${fileName}`);
       await mysqldump({
@@ -42,22 +43,14 @@ export default class MySQLBackupDriver implements BackupDriver {
       });
 
       console.info(`Uploading database backup ${fileName}`);
-      this.s3.upload({
-        Bucket: this.s3Data.bucket,
-        Key: `backup/mysql_${config.database.name}/${fileName}`,
-        Body: fs.readFileSync(fileName),
-        ACL: 'private',
-      }, (err, data) => {
-        if (err) {
-          console.error(err);
-        }
-        console.info(data);
-
-        console.info(`Unlinking local database backup ${fileName}`);
-        fs.unlinkSync(fileName);
-
-        console.info(`Backup finished ${fileName}`);
+      s3upload({
+        s3: this.s3,
+        databaseName: config.database.name,
+        bucketName: this.s3Data.bucket,
+        fileName,
       });
+      unlinking({ fileName });
+      console.info(`Backup finished ${fileName}`);
     } catch (e) {
       console.error(e);
     }

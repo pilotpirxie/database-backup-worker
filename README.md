@@ -1,5 +1,5 @@
 # database-backup-worker
-Backend worker to periodically dump full **MySQL** or **ClickHouse** database and upload to S3. You can setup multiple databases on a single instance.
+Backend worker to periodically dump full **MySQL**, **PostgreSQL** or **ClickHouse** database and upload to S3. You can setup multiple databases on a single instance.
 
 ### Getting started
 ```shell
@@ -23,7 +23,7 @@ DB_NUMBER=1
 # leave it default if you don't know what you are doing.
 DB_CRON_PATTERN_<INDEX>="0 */6 * * *"
 
-# Database type "mysql" or "clickhouse"
+# Database type "mysql", "clickhouse" or "postgresql"
 DB_TYPE_<INDEX>=
 
 # Database host
