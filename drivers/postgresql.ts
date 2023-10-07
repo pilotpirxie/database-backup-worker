@@ -81,6 +81,7 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
         databaseName: config.database.name,
         bucketName: this.s3Data.bucket,
         fileName,
+        databaseType: 'postgresql',
       });
       unlinking({ fileName });
       console.info(`Backup finished ${fileName}`);

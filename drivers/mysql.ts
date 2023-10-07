@@ -48,6 +48,7 @@ export default class MySQLBackupDriver implements BackupDriver {
         databaseName: config.database.name,
         bucketName: this.s3Data.bucket,
         fileName,
+        databaseType: 'mysql',
       });
       unlinking({ fileName });
       console.info(`Backup finished ${fileName}`);
