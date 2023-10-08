@@ -45,9 +45,11 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
 
       const tables = await db.any("SELECT table_name FROM information_schema.tables WHERE table_schema='public'");
 
-      let sql = '';
+      await fs.writeFileSync(fileName, '', { flag: 'w' });
 
       for (let i = 0; i < tables.length; i++) {
+        let sql = `-- ${tables[i].table_name} \n`;
+
         const table = tables[i];
         const tableName = table.table_name;
         const data = await db.any(`SELECT * FROM ${tableName}`);
@@ -71,9 +73,10 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
 
           sql += `INSERT INTO ${tableName} (${keys}) VALUES (${values});\n`;
         });
+
+        await fs.writeFileSync(fileName, `${sql}\n`, { flag: 'a' });
       }
 
-      await fs.writeFileSync(fileName, sql);
 
       console.info(`Uploading database backup ${fileName}`);
       s3upload({
@@ -83,7 +86,7 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
         fileName,
         databaseType: 'postgresql',
       });
-      unlinking({ fileName });
+      // unlinking({ fileName });
       console.info(`Backup finished ${fileName}`);
     } catch (e) {
       console.error(e);
