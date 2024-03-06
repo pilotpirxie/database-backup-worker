@@ -1,9 +1,13 @@
-import AWS from 'aws-sdk';
-import dayjs from 'dayjs';
-import mysqldump from 'mysqldump';
-import { BackupDriver, DatabaseConfiguration, S3Configuration } from './BackupDriver';
-import s3upload from '../utils/s3upload';
-import unlinking from '../utils/unlinking';
+import AWS from "aws-sdk";
+import dayjs from "dayjs";
+import mysqldump from "mysqldump";
+import {
+  BackupDriver,
+  DatabaseConfiguration,
+  S3Configuration,
+} from "./BackupDriver";
+import s3upload from "../utils/s3upload";
+import unlinking from "../utils/unlinking";
 
 export default class MySQLBackupDriver implements BackupDriver {
   private s3: AWS.S3;
@@ -23,12 +27,14 @@ export default class MySQLBackupDriver implements BackupDriver {
       },
     });
 
-    this.s3 = new AWS.S3({ apiVersion: '2006-03-01' });
+    this.s3 = new AWS.S3({ apiVersion: "2006-03-01" });
   }
 
-  async prepareBackup(config: { database: DatabaseConfiguration; }): Promise<void> {
+  async prepareBackup(config: {
+    database: DatabaseConfiguration;
+  }): Promise<void> {
     try {
-      const fileName = `dump_${dayjs().format('YYYY_MM_DD_hh_mm_ss')}.sql`;
+      const fileName = `dump_${dayjs().format("YYYY_MM_DD_hh_mm_ss")}.sql`;
 
       console.info(`Preparing database backup ${fileName}`);
       await mysqldump({
@@ -40,6 +46,15 @@ export default class MySQLBackupDriver implements BackupDriver {
           database: config.database.name,
         },
         dumpToFile: fileName,
+        dump: {
+          data: {
+            format: false,
+            maxRowsPerInsertStatement: 1000,
+          },
+          schema: {
+            format: false,
+          },
+        },
       });
 
       console.info(`Uploading database backup ${fileName}`);
@@ -48,7 +63,7 @@ export default class MySQLBackupDriver implements BackupDriver {
         databaseName: config.database.name,
         bucketName: this.s3Data.bucket,
         fileName,
-        databaseType: 'mysql',
+        databaseType: "mysql",
       });
       unlinking({ fileName });
       console.info(`Backup finished ${fileName}`);
