@@ -9,6 +9,9 @@ import {
 } from "./BackupDriver";
 import s3upload from "../utils/s3upload";
 import unlinking from "../utils/unlinking";
+import { compressFile } from "../utils/compress";
+
+const BATCH_SIZE = 10_000;
 
 export default class PostgreSQLBackupDriver implements BackupDriver {
   private s3: AWS.S3 | null = null;
@@ -101,25 +104,151 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
     return `INSERT INTO ${tableName} (${keys}) VALUES (${values});`;
   }
 
+  private async backupTableWithCursor(
+    db: pgp.IDatabase<unknown>,
+    tableName: string,
+    fileName: string,
+    rowsCount: number,
+    cursorColumn: string,
+  ) {
+    let lastValue: number = 0;
+    let processedRows = 0;
+
+    while (processedRows < rowsCount) {
+      const data = await db.any<Record<string, unknown>>(
+        `SELECT * FROM ${tableName} WHERE ${cursorColumn} > $1 ORDER BY ${cursorColumn} LIMIT ${BATCH_SIZE}`,
+        [lastValue],
+      );
+
+      if (data.length === 0) break;
+
+      const insertStatements = data
+        .map((row) => this.generateInsertStatement(tableName, row))
+        .join("\n");
+
+      fs.appendFileSync(fileName, insertStatements + "\n", { flag: "a" });
+
+      lastValue = data[data.length - 1][cursorColumn] as number;
+      processedRows += data.length;
+
+      console.info(
+        `Progress for ${tableName}: ${((processedRows / rowsCount) * 100).toFixed(2)}%`,
+      );
+    }
+  }
+
+  private async backupTableWithOffset(
+    db: pgp.IDatabase<unknown>,
+    tableName: string,
+    fileName: string,
+    rowsCount: number,
+  ) {
+    let offset = 0;
+
+    while (offset < rowsCount) {
+      const data = await db.any<Record<string, unknown>>(
+        `SELECT * FROM ${tableName} OFFSET ${offset} LIMIT ${BATCH_SIZE}`,
+      );
+
+      const insertStatements = data
+        .map((row) => this.generateInsertStatement(tableName, row))
+        .join("\n");
+
+      fs.appendFileSync(fileName, insertStatements + "\n", { flag: "a" });
+
+      offset += BATCH_SIZE;
+
+      console.info(
+        `Progress for ${tableName}: ${((offset / rowsCount) * 100).toFixed(2)}%`,
+      );
+    }
+  }
+
+  private async getNumericPrimaryKeyColumn(
+    db: pgp.IDatabase<unknown>,
+    tableName: string,
+  ): Promise<string | null> {
+    const result = await db.oneOrNone<{ column_name: string }>(
+      `
+    SELECT 
+      pg_attribute.attname AS column_name 
+    FROM      
+      pg_index 
+    JOIN     
+      pg_attribute ON pg_attribute.attrelid = pg_index.indrelid                  
+      AND pg_attribute.attnum = ANY(pg_index.indkey) 
+    JOIN
+      information_schema.columns ON columns.table_name = $1
+      AND columns.column_name = pg_attribute.attname
+    WHERE      
+      pg_index.indrelid = $1::regclass     
+      AND pg_index.indisprimary
+      AND columns.data_type IN ('smallint', 'integer', 'bigint', 'decimal', 'numeric', 'real', 'double precision', 'smallserial', 'serial', 'bigserial')
+    `,
+      [tableName],
+    );
+    return result ? result.column_name : null;
+  }
+
+  private async getAutoIncrementColumn(
+    db: pgp.IDatabase<unknown>,
+    tableName: string,
+  ): Promise<string | null> {
+    const result = await db.oneOrNone<{ column_name: string }>(
+      `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = $1
+      AND column_default LIKE 'nextval%'
+      `,
+      [tableName],
+    );
+    return result ? result.column_name : null;
+  }
+
   private async backupTable(
     db: pgp.IDatabase<unknown>,
     tableName: string,
-  ): Promise<string> {
-    const data = await db.any<Record<string, unknown>>(
-      `SELECT * FROM ${tableName}`,
+    fileName: string,
+  ) {
+    fs.appendFileSync(fileName, `-- ${tableName}\n`, { flag: "a" });
+
+    const rowsResult = await db.one<{ count: number }>(
+      `SELECT COUNT(*) FROM ${tableName}`,
     );
-    const insertStatements = data.map((row) =>
-      this.generateInsertStatement(tableName, row),
+    const rowsCount = rowsResult.count;
+
+    const numericPrimaryKeyColumn = await this.getNumericPrimaryKeyColumn(
+      db,
+      tableName,
     );
-    return `-- ${tableName}\n${insertStatements.join("\n")}\n`;
+    const autoIncrementColumn = await this.getAutoIncrementColumn(
+      db,
+      tableName,
+    );
+    const cursorColumn = numericPrimaryKeyColumn || autoIncrementColumn;
+    console.info(
+      `Backing up table ${tableName}. Found ${rowsCount} rows. Using ${cursorColumn ? "cursor" : "offset"} method.`,
+    );
+
+    if (cursorColumn) {
+      await this.backupTableWithCursor(
+        db,
+        tableName,
+        fileName,
+        rowsCount,
+        cursorColumn,
+      );
+    } else {
+      await this.backupTableWithOffset(db, tableName, fileName, rowsCount);
+    }
   }
 
   async prepareBackup(config: {
     database: DatabaseConfiguration;
   }): Promise<void> {
     if (!this.s3) {
-      console.error("S3 is not initialized");
-      return;
+      throw new Error("S3 is not initialized");
     }
 
     try {
@@ -131,22 +260,23 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
       const tables = await this.getAllTables(db);
 
       for (const table of tables) {
-        const backup = await this.backupTable(db, table);
-        fs.appendFileSync(fileName, backup + "\n", { flag: "a" });
+        await this.backupTable(db, table, fileName);
       }
-
       await this.disconnectFromDatabase(db);
 
+      const compressedFileName = await compressFile(fileName);
+
       console.info(`Uploading database backup ${fileName}`);
-      s3upload({
+      await s3upload({
         s3: this.s3,
         databaseName: config.database.name,
         bucketName: this.s3Configuration.bucket,
-        fileName,
+        fileName: compressedFileName,
         databaseType: "postgresql",
       });
-      unlinking({ fileName });
 
+      unlinking({ fileName });
+      unlinking({ fileName: compressedFileName });
       console.info(`Backup finished ${fileName}`);
     } catch (e) {
       console.error(e);

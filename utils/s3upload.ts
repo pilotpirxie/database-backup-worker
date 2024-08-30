@@ -13,19 +13,24 @@ export default function s3upload({
   databaseName: string;
   fileName: string;
   bucketName: string;
-}) {
-  s3.upload(
-    {
-      Bucket: bucketName,
-      Key: `backup/${databaseType}_${databaseName}/${fileName}`,
-      Body: fs.readFileSync(fileName),
-      ACL: "private",
-    },
-    (err, data) => {
-      if (err) {
-        console.error(err);
-      }
-      console.info(data);
-    },
-  );
+}): Promise<AWS.S3.ManagedUpload.SendData> {
+  return new Promise((resolve, reject) => {
+    s3.upload(
+      {
+        Bucket: bucketName,
+        Key: `backup/${databaseType}_${databaseName}/${fileName}`,
+        Body: fs.readFileSync(fileName),
+        ACL: "private",
+      },
+      (err, data) => {
+        if (err) {
+          console.error(err);
+          reject(err);
+        } else {
+          console.info(data);
+          resolve(data);
+        }
+      },
+    );
+  });
 }

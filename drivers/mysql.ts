@@ -8,6 +8,7 @@ import {
 } from "./BackupDriver";
 import s3upload from "../utils/s3upload";
 import unlinking from "../utils/unlinking";
+import { compressFile } from "../utils/compress";
 
 export default class MySQLBackupDriver implements BackupDriver {
   private readonly s3: AWS.S3;
@@ -56,15 +57,19 @@ export default class MySQLBackupDriver implements BackupDriver {
         },
       });
 
+      const compressedFileName = await compressFile(fileName);
+
       console.info(`Uploading database backup ${fileName}`);
-      s3upload({
+      await s3upload({
         s3: this.s3,
         databaseName: config.database.name,
         bucketName: this.s3Data.bucket,
-        fileName,
+        fileName: compressedFileName,
         databaseType: "mysql",
       });
+
       unlinking({ fileName });
+      unlinking({ fileName: compressedFileName });
       console.info(`Backup finished ${fileName}`);
     } catch (e) {
       console.error(e);
