@@ -1,4 +1,4 @@
-import fs from "fs";
+import { readFileSync } from "node:fs";
 import AWS from "aws-sdk";
 
 export default function s3upload({
@@ -19,7 +19,7 @@ export default function s3upload({
       {
         Bucket: bucketName,
         Key: `backup/${databaseType}_${databaseName}/${fileName}`,
-        Body: fs.readFileSync(fileName),
+        Body: readFileSync(fileName),
         ACL: "private",
       },
       (err, data) => {

@@ -7,7 +7,7 @@ import {
 } from "./drivers/BackupDriver";
 import MySQLBackupDriver from "./drivers/mysql";
 import ClickhouseBackupDriver from "./drivers/clickhouse";
-import validate from "./utils/validate";
+import { validate } from "./utils/validate";
 import PostgreSQLBackupDriver from "./drivers/postgresql";
 
 const {

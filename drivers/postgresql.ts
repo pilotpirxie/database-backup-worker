@@ -1,6 +1,5 @@
 import AWS from "aws-sdk";
 import dayjs from "dayjs";
-import fs from "fs";
 import pgp from "pg-promise";
 import {
   BackupDriver,
@@ -10,6 +9,7 @@ import {
 import s3upload from "../utils/s3upload";
 import unlinking from "../utils/unlinking";
 import { compressFile } from "../utils/compress";
+import { appendFileSync, writeFileSync } from "node:fs";
 
 const BATCH_SIZE = 10_000;
 const INSERT_BATCH_SIZE = 1_000;
@@ -146,7 +146,7 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
       if (data.length === 0) break;
 
       const insertStatements = this.generateInsertStatements(tableName, data);
-      fs.appendFileSync(fileName, insertStatements, { flag: "a" });
+      appendFileSync(fileName, insertStatements, { flag: "a" });
 
       lastValue = data[data.length - 1][cursorColumn] as number;
       processedRows += data.length;
@@ -171,7 +171,7 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
       );
 
       const insertStatements = this.generateInsertStatements(tableName, data);
-      fs.appendFileSync(fileName, insertStatements + "\n", { flag: "a" });
+      appendFileSync(fileName, insertStatements + "\n", { flag: "a" });
 
       offset += BATCH_SIZE;
 
@@ -228,7 +228,7 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
     tableName: string,
     fileName: string,
   ) {
-    fs.appendFileSync(fileName, `\n-- ${tableName}\n`, { flag: "a" });
+    appendFileSync(fileName, `\n-- ${tableName}\n`, { flag: "a" });
 
     const rowsResult = await db.one<{ count: number }>(
       `SELECT COUNT(*) FROM ${tableName}`,
@@ -271,7 +271,7 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
     try {
       const fileName = `dump_${dayjs().format("YYYY_MM_DD_hh_mm_ss")}.sql`;
       console.info(`Preparing database backup ${fileName}`);
-      fs.writeFileSync(fileName, "", { flag: "w" });
+      writeFileSync(fileName, "", { flag: "w" });
 
       const db = await this.connectToDatabase(config.database);
       const tables = await this.getAllTables(db);
