@@ -59,7 +59,7 @@ export default class MySQLBackupDriver implements BackupDriver {
 
       const compressedFileName = await compressFile(fileName);
 
-      console.info(`Uploading database backup ${fileName}`);
+      console.info(`Uploading database backup ${compressedFileName}`);
       await s3upload({
         s3: this.s3,
         databaseName: config.database.name,
@@ -70,7 +70,7 @@ export default class MySQLBackupDriver implements BackupDriver {
 
       unlinking({ fileName });
       unlinking({ fileName: compressedFileName });
-      console.info(`Backup finished ${fileName}`);
+      console.info(`Backup finished ${compressedFileName}`);
     } catch (e) {
       console.error(e);
     }

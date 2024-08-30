@@ -66,7 +66,7 @@ for (let i = 0; i < Number(DB_NUMBER || 1); i++) {
     console.error(
       `Missing env properties for database (${i})! Check documentation and try again.`,
     );
-    continue;
+    process.exit(1);
   }
 
   const name = process.env[`DB_NAME_${i}`] || "";
