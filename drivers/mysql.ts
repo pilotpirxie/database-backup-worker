@@ -10,8 +10,7 @@ import s3upload from "../utils/s3upload";
 import unlinking from "../utils/unlinking";
 
 export default class MySQLBackupDriver implements BackupDriver {
-  private s3: AWS.S3;
-
+  private readonly s3: AWS.S3;
   private s3Data: S3Configuration;
 
   constructor(s3Data: S3Configuration) {

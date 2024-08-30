@@ -11,93 +11,142 @@ import s3upload from "../utils/s3upload";
 import unlinking from "../utils/unlinking";
 
 export default class PostgreSQLBackupDriver implements BackupDriver {
-  private s3: AWS.S3;
+  private s3: AWS.S3 | null = null;
+  private s3Configuration: S3Configuration;
 
-  private s3Data: S3Configuration;
+  constructor(S3Configuration: S3Configuration) {
+    this.s3Configuration = S3Configuration;
+    this.initializeAWS();
+  }
 
-  constructor(s3Data: S3Configuration) {
-    this.s3Data = s3Data;
-
+  private initializeAWS(): void {
     AWS.config.update({
-      accessKeyId: this.s3Data.accessKey,
-      secretAccessKey: this.s3Data.secretKey,
+      accessKeyId: this.s3Configuration.accessKey,
+      secretAccessKey: this.s3Configuration.secretKey,
       s3: {
-        endpoint: this.s3Data.endpoint,
-        sslEnabled: this.s3Data.secure,
-        s3ForcePathStyle: this.s3Data.forcePathStyle,
+        endpoint: this.s3Configuration.endpoint,
+        sslEnabled: this.s3Configuration.secure,
+        s3ForcePathStyle: this.s3Configuration.forcePathStyle,
       },
     });
-
     this.s3 = new AWS.S3({ apiVersion: "2006-03-01" });
+  }
+
+  private async connectToDatabase(
+    config: DatabaseConfiguration,
+  ): Promise<pgp.IDatabase<unknown>> {
+    return pgp()({
+      host: config.host,
+      port: config.port,
+      database: config.name,
+      user: config.user,
+      password: config.password,
+      ssl: {
+        rejectUnauthorized: false,
+      },
+    });
+  }
+
+  private async disconnectFromDatabase(
+    db: pgp.IDatabase<unknown>,
+  ): Promise<void> {
+    await db.$pool.end();
+  }
+
+  private async getAllTables(db: pgp.IDatabase<unknown>): Promise<string[]> {
+    const result = await db.any<{ table_name: string }>(
+      "SELECT table_name FROM information_schema.tables WHERE table_schema='public'",
+    );
+    return result.map((row) => row.table_name);
+  }
+
+  private formatValue(value: unknown): string {
+    if (value === null || value === undefined) {
+      return "NULL";
+    }
+
+    if (typeof value === "number") {
+      return value.toString();
+    }
+
+    if (typeof value === "boolean") {
+      return value ? "TRUE" : "FALSE";
+    }
+
+    if (value instanceof Date) {
+      return `'${value.toISOString()}'`;
+    }
+
+    if (Array.isArray(value)) {
+      return `ARRAY[${value.map((val) => `'${val}'`).join(",")}]`;
+    }
+
+    if (Buffer.isBuffer(value)) {
+      return `E'\\\\x${value.toString("hex")}'`;
+    }
+
+    if (typeof value === "object") {
+      return `'${JSON.stringify(value).replaceAll("'", "''")}'::jsonb`;
+    }
+
+    return `'${value.toString().replaceAll("'", "''")}'`;
+  }
+
+  private generateInsertStatement(
+    tableName: string,
+    row: Record<string, unknown>,
+  ): string {
+    const keys = Object.keys(row).join(", ");
+    const values = Object.values(row).map(this.formatValue).join(", ");
+    return `INSERT INTO ${tableName} (${keys}) VALUES (${values});`;
+  }
+
+  private async backupTable(
+    db: pgp.IDatabase<unknown>,
+    tableName: string,
+  ): Promise<string> {
+    const data = await db.any<Record<string, unknown>>(
+      `SELECT * FROM ${tableName}`,
+    );
+    const insertStatements = data.map((row) =>
+      this.generateInsertStatement(tableName, row),
+    );
+    return `-- ${tableName}\n${insertStatements.join("\n")}\n`;
   }
 
   async prepareBackup(config: {
     database: DatabaseConfiguration;
   }): Promise<void> {
+    if (!this.s3) {
+      console.error("S3 is not initialized");
+      return;
+    }
+
     try {
       const fileName = `dump_${dayjs().format("YYYY_MM_DD_hh_mm_ss")}.sql`;
-
       console.info(`Preparing database backup ${fileName}`);
-      const db = pgp()({
-        host: config.database.host,
-        port: config.database.port,
-        database: config.database.name,
-        user: config.database.user,
-        password: config.database.password,
-        ssl: {
-          rejectUnauthorized: false,
-        },
-      });
+      fs.writeFileSync(fileName, "", { flag: "w" });
 
-      const tables = await db.any(
-        "SELECT table_name FROM information_schema.tables WHERE table_schema='public'",
-      );
+      const db = await this.connectToDatabase(config.database);
+      const tables = await this.getAllTables(db);
 
-      await fs.writeFileSync(fileName, "", { flag: "w" });
-
-      for (let i = 0; i < tables.length; i++) {
-        let sql = `-- ${tables[i].table_name} \n`;
-
-        const table = tables[i];
-        const tableName = table.table_name;
-        const data = await db.any(`SELECT * FROM ${tableName}`);
-
-        let keys: string = "";
-        data.forEach((row) => {
-          if (!keys.length) {
-            keys = Object.keys(row).join(", ");
-          }
-
-          const values = Object.values(row)
-            .map((value) => {
-              if (value === undefined) return "NULL";
-              if (value === null) return "NULL";
-              if (typeof value === "number") return value;
-              if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
-              if (value instanceof Date) return `'${value.toISOString()}'`;
-              if (Array.isArray(value))
-                return `ARRAY[${value.map((val) => `'${val}'`).join(",")}]`;
-              if (Buffer.isBuffer(value))
-                return `E'\\\\x${value.toString("hex")}'`;
-              return `'${value.toString().replace(/'/g, "''")}'`;
-            })
-            .join(", ");
-
-          sql += `INSERT INTO ${tableName} (${keys}) VALUES (${values});\n`;
-        });
-
-        await fs.writeFileSync(fileName, `${sql}\n`, { flag: "a" });
+      for (const table of tables) {
+        const backup = await this.backupTable(db, table);
+        fs.appendFileSync(fileName, backup + "\n", { flag: "a" });
       }
+
+      await this.disconnectFromDatabase(db);
 
       console.info(`Uploading database backup ${fileName}`);
       s3upload({
         s3: this.s3,
         databaseName: config.database.name,
-        bucketName: this.s3Data.bucket,
+        bucketName: this.s3Configuration.bucket,
         fileName,
         databaseType: "postgresql",
       });
-      // unlinking({ fileName });
+      unlinking({ fileName });
+
       console.info(`Backup finished ${fileName}`);
     } catch (e) {
       console.error(e);
