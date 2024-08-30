@@ -22,6 +22,10 @@ Config in `.env` file should look like following:
 # Index for database config is 0-based
 DB_NUMBER=1
 
+# Whether to run backup on start without
+# waiting for the cron time
+RUN_ON_START=false
+
 # Cron time pattern, use https://crontab.guru/
 # e.g. "0 */6 * * *" means "At minute 0 past every 6th hour."
 # leave it default if you don't know what you are doing.
