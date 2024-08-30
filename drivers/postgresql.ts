@@ -18,8 +18,8 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
   private s3: AWS.S3 | null = null;
   private s3Configuration: S3Configuration;
 
-  constructor(S3Configuration: S3Configuration) {
-    this.s3Configuration = S3Configuration;
+  constructor(s3Configuration: S3Configuration) {
+    this.s3Configuration = s3Configuration;
     this.initializeAWS();
   }
 
