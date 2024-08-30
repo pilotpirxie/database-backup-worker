@@ -1,7 +1,9 @@
 # database-backup-worker
+
 Backend worker to periodically dump full **MySQL**, **PostgreSQL** or **ClickHouse** database and upload to S3. You can setup multiple databases on a single instance.
 
 ### Getting started
+
 ```shell
 git clone https://github.com/pilotpirxie/database-backup-worker.git
 cd database-backup-worker
@@ -11,7 +13,9 @@ yarn start
 ```
 
 ### Setup
-Config in ``.env`` file should look like following:
+
+Config in `.env` file should look like following:
+
 ```shell
 # Number of databases to backup
 # For each database setup environment variables prefixed with DB_
@@ -63,6 +67,7 @@ S3_FORCE_PATH_STYLE=true
 ```
 
 ### License
+
 ```
 MIT
 ```

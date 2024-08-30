@@ -1,10 +1,14 @@
-import AWS from 'aws-sdk';
-import dayjs from 'dayjs';
-import fs from 'fs';
-import pgp from 'pg-promise';
-import { BackupDriver, DatabaseConfiguration, S3Configuration } from './BackupDriver';
-import s3upload from '../utils/s3upload';
-import unlinking from '../utils/unlinking';
+import AWS from "aws-sdk";
+import dayjs from "dayjs";
+import fs from "fs";
+import pgp from "pg-promise";
+import {
+  BackupDriver,
+  DatabaseConfiguration,
+  S3Configuration,
+} from "./BackupDriver";
+import s3upload from "../utils/s3upload";
+import unlinking from "../utils/unlinking";
 
 export default class PostgreSQLBackupDriver implements BackupDriver {
   private s3: AWS.S3;
@@ -24,12 +28,14 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
       },
     });
 
-    this.s3 = new AWS.S3({ apiVersion: '2006-03-01' });
+    this.s3 = new AWS.S3({ apiVersion: "2006-03-01" });
   }
 
-  async prepareBackup(config: { database: DatabaseConfiguration; }): Promise<void> {
+  async prepareBackup(config: {
+    database: DatabaseConfiguration;
+  }): Promise<void> {
     try {
-      const fileName = `dump_${dayjs().format('YYYY_MM_DD_hh_mm_ss')}.sql`;
+      const fileName = `dump_${dayjs().format("YYYY_MM_DD_hh_mm_ss")}.sql`;
 
       console.info(`Preparing database backup ${fileName}`);
       const db = pgp()({
@@ -43,9 +49,11 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
         },
       });
 
-      const tables = await db.any("SELECT table_name FROM information_schema.tables WHERE table_schema='public'");
+      const tables = await db.any(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema='public'",
+      );
 
-      await fs.writeFileSync(fileName, '', { flag: 'w' });
+      await fs.writeFileSync(fileName, "", { flag: "w" });
 
       for (let i = 0; i < tables.length; i++) {
         let sql = `-- ${tables[i].table_name} \n`;
@@ -54,29 +62,32 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
         const tableName = table.table_name;
         const data = await db.any(`SELECT * FROM ${tableName}`);
 
-        let keys: string = '';
+        let keys: string = "";
         data.forEach((row) => {
           if (!keys.length) {
-            keys = Object.keys(row).join(', ');
+            keys = Object.keys(row).join(", ");
           }
 
-          const values = Object.values(row).map((value) => {
-            if (value === undefined) return 'NULL';
-            if (value === null) return 'NULL';
-            if (typeof value === 'number') return value;
-            if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
-            if (value instanceof Date) return `'${value.toISOString()}'`;
-            if (Array.isArray(value)) return `ARRAY[${value.map((val) => `'${val}'`).join(',')}]`;
-            if (Buffer.isBuffer(value)) return `E'\\\\x${value.toString('hex')}'`;
-            return `'${value.toString().replace(/'/g, "''")}'`;
-          }).join(', ');
+          const values = Object.values(row)
+            .map((value) => {
+              if (value === undefined) return "NULL";
+              if (value === null) return "NULL";
+              if (typeof value === "number") return value;
+              if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+              if (value instanceof Date) return `'${value.toISOString()}'`;
+              if (Array.isArray(value))
+                return `ARRAY[${value.map((val) => `'${val}'`).join(",")}]`;
+              if (Buffer.isBuffer(value))
+                return `E'\\\\x${value.toString("hex")}'`;
+              return `'${value.toString().replace(/'/g, "''")}'`;
+            })
+            .join(", ");
 
           sql += `INSERT INTO ${tableName} (${keys}) VALUES (${values});\n`;
         });
 
-        await fs.writeFileSync(fileName, `${sql}\n`, { flag: 'a' });
+        await fs.writeFileSync(fileName, `${sql}\n`, { flag: "a" });
       }
-
 
       console.info(`Uploading database backup ${fileName}`);
       s3upload({
@@ -84,7 +95,7 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
         databaseName: config.database.name,
         bucketName: this.s3Data.bucket,
         fileName,
-        databaseType: 'postgresql',
+        databaseType: "postgresql",
       });
       // unlinking({ fileName });
       console.info(`Backup finished ${fileName}`);
