@@ -12,6 +12,7 @@ import unlinking from "../utils/unlinking";
 import { compressFile } from "../utils/compress";
 
 const BATCH_SIZE = 10_000;
+const INSERT_BATCH_SIZE = 1_000;
 
 export default class PostgreSQLBackupDriver implements BackupDriver {
   private s3: AWS.S3 | null = null;
@@ -95,13 +96,35 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
     return `'${value.toString().replaceAll("'", "''")}'`;
   }
 
-  private generateInsertStatement(
+  private generateInsertStatements(
     tableName: string,
-    row: Record<string, unknown>,
+    rows: Record<string, unknown>[],
   ): string {
-    const keys = Object.keys(row).join(", ");
-    const values = Object.values(row).map(this.formatValue).join(", ");
-    return `INSERT INTO ${tableName} (${keys}) VALUES (${values});`;
+    let insertStatements = "";
+    let currentRows = 0;
+
+    for (const row of rows) {
+      const values = Object.values(row).map(this.formatValue).join(", ");
+
+      if (currentRows === 0) {
+        const keys = Object.keys(row).join(", ");
+        insertStatements += `INSERT INTO ${tableName} (${keys}) VALUES (${values})`;
+      } else {
+        insertStatements += `, (${values})`;
+      }
+
+      currentRows++;
+      if (currentRows === INSERT_BATCH_SIZE) {
+        insertStatements += ";\n";
+        currentRows = 0;
+      }
+    }
+
+    if (currentRows > 0 && insertStatements.endsWith(")")) {
+      insertStatements += ";\n";
+    }
+
+    return insertStatements;
   }
 
   private async backupTableWithCursor(
@@ -122,11 +145,8 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
 
       if (data.length === 0) break;
 
-      const insertStatements = data
-        .map((row) => this.generateInsertStatement(tableName, row))
-        .join("\n");
-
-      fs.appendFileSync(fileName, insertStatements + "\n", { flag: "a" });
+      const insertStatements = this.generateInsertStatements(tableName, data);
+      fs.appendFileSync(fileName, insertStatements, { flag: "a" });
 
       lastValue = data[data.length - 1][cursorColumn] as number;
       processedRows += data.length;
@@ -150,10 +170,7 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
         `SELECT * FROM ${tableName} OFFSET ${offset} LIMIT ${BATCH_SIZE}`,
       );
 
-      const insertStatements = data
-        .map((row) => this.generateInsertStatement(tableName, row))
-        .join("\n");
-
+      const insertStatements = this.generateInsertStatements(tableName, data);
       fs.appendFileSync(fileName, insertStatements + "\n", { flag: "a" });
 
       offset += BATCH_SIZE;
@@ -211,7 +228,7 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
     tableName: string,
     fileName: string,
   ) {
-    fs.appendFileSync(fileName, `-- ${tableName}\n`, { flag: "a" });
+    fs.appendFileSync(fileName, `\n-- ${tableName}\n`, { flag: "a" });
 
     const rowsResult = await db.one<{ count: number }>(
       `SELECT COUNT(*) FROM ${tableName}`,
