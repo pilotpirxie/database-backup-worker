@@ -277,6 +277,10 @@ export default class PostgreSQLBackupDriver implements BackupDriver {
       const tables = await this.getAllTables(db);
 
       for (const table of tables) {
+        if (config.database.skipTables.includes(table)) {
+          console.info(`Skipping table ${table}...`);
+          continue;
+        }
         await this.backupTable(db, table, fileName);
       }
       await this.disconnectFromDatabase(db);

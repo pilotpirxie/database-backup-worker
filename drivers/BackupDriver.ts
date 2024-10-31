@@ -4,6 +4,7 @@ export type DatabaseConfiguration = {
   port: number;
   user: string;
   password: string;
+  skipTables: string[];
 };
 
 export type S3Configuration = {

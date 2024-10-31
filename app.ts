@@ -76,6 +76,9 @@ for (let i = 0; i < Number(DB_NUMBER || 1); i++) {
   const password = process.env[`DB_PASS_${i}`] || "";
   const cronPattern = process.env[`DB_CRON_PATTERN_${i}`] || "0 */6 * * *";
   const databaseType = process.env[`DB_TYPE_${i}`] || "";
+  const skipTables = Object.hasOwn(process.env, `DB_SKIP_TABLES_${i}`)
+    ? process.env[`DB_SKIP_TABLES_${i}`]
+    : "";
 
   const dbConfig: DatabaseConfiguration = {
     name,
@@ -83,6 +86,7 @@ for (let i = 0; i < Number(DB_NUMBER || 1); i++) {
     user,
     port,
     host,
+    skipTables: skipTables ? skipTables.split(",") : [],
   };
 
   if (!driverMap.hasOwnProperty(databaseType)) {

@@ -54,6 +54,8 @@ export default class MySQLBackupDriver implements BackupDriver {
           schema: {
             format: false,
           },
+          excludeTables: true,
+          tables: config.database.skipTables,
         },
       });
 

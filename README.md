@@ -51,6 +51,10 @@ DB_USER_<INDEX>=
 # Database user password
 DB_PASS_<INDEX>=
 
+# Skip tables, comma separated
+# e.g. "table1,table2"
+DB_SKIP_TABLES_<INDEX>=
+
 # S3 compatible bucket name
 S3_BUCKET=
 
